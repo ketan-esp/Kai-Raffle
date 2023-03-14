@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.16;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 contract Lottery {
     address public owner;
-    address payable[] public ticketHolders; //list of players
+    address[] public ticketHolders; //list of players
     uint256 public currentLotteryId = 0;
     uint256 public currentOfferId = 0;
     uint256 public numberOfLoterries = 0;
@@ -21,7 +19,6 @@ contract Lottery {
     mapping(uint256 => uint256) public prizes;
     mapping(address => bool) public players;
     mapping(uint256 => mapping(address => uint256)) public pendingWithdrawals;
-    IERC20 public token;
 
     struct LotteryStruct {
         uint256 lotteryId;
@@ -54,9 +51,8 @@ contract Lottery {
 
     event NewLottery(address creator, uint256 startTime, uint256 endTime);
 
-    constructor(address _token, uint256 _ticketPrice) {
+    constructor(uint256 _ticketPrice) {
         owner = msg.sender;
-        token = IERC20(_token);
         //ticketPrice = _ticketPrice;
     }
 
@@ -119,14 +115,14 @@ contract Lottery {
     }
 
     function buyTickets(bytes32 offerId, bytes32 lotteryId) external payable {
-        // uint _numTickets = msg.value;
+        uint256 _numTickets = msg.value;
         uint256 _activePlayers = activePlayers;
-        if (ticketHolders[msg.sender] == false) {
+        if (players[msg.sender] == false) {
             require(_activePlayers + 1 <= maxPlayersAllowed);
             if (ticketHolders.length > _activePlayers) {
                 ticketHolders[_activePlayers] = msg.sender;
             } else {
-                ticketHolders.push(payable(msg.sender));
+                ticketHolders.push(msg.sender);
             }
             players[msg.sender] = true;
             activePlayers = _activePlayers + 1;
@@ -154,7 +150,9 @@ contract Lottery {
     }
 
     function depositWinnings() public {
-        pendingWithdrawals[currentLotteryId][winningTicket.addr] = prizeAmount;
+        pendingWithdrawals[currentLotteryId][
+            winningTicket.winningAddress
+        ] = prizeAmount;
         prizeAmount = 0;
         lotteries[currentLotteryId].isCompleted = true;
         winningTickets[currentLotteryId] = winningTicket;
@@ -173,7 +171,7 @@ contract Lottery {
         return (
             ticketDistribution[_playerIndex].playerAddress,
             ticketDistribution[_playerIndex].startIndex,
-            ticketDistribution[_playerIndex.endIndex]
+            ticketDistribution[_playerIndex].endIndex
         );
     }
 
@@ -202,7 +200,7 @@ contract Lottery {
     function findWinningAddress(uint256 _winningTicketIndex) public {
         uint256 _activePlayers = activePlayers;
         if (_activePlayers == 1) {
-            winningTicket.addr = ticketDistribution[0].playerAddress;
+            winningTicket.winningAddress = ticketDistribution[0].playerAddress;
         } else {
             uint256 _winningPlayerIndex = binarySearch(
                 0,
@@ -212,8 +210,9 @@ contract Lottery {
             if (_winningPlayerIndex >= _activePlayers) {
                 revert("Invalid");
             }
-            winningTicket.addr = ticketDistribution[_winningPlayerIndex]
-                .playerAddress;
+            winningTicket.winningAddress = ticketDistribution[
+                _winningPlayerIndex
+            ].playerAddress;
         }
     }
 
@@ -255,9 +254,9 @@ contract Lottery {
         lotteries[currentLotteryId].isActive = false;
         lotteries[currentLotteryId].isCompleted = true;
         winningTicket = WinningTicket({
-            currentLotteryid: 0,
+            currentLotteryId: 0,
             winningTicketIndex: 0,
-            addr: address(0)
+            winningAddress: address(0)
         });
         currentLotteryId = currentLotteryId + (1);
     }
